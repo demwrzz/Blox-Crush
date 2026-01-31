@@ -2,21 +2,16 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Bloxybet MM2</title>
+<title>MM2 Coinflip</title>
 <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.6.0.min.js"></script>
 
 <style>
-*{box-sizing:border-box}
 body{margin:0;background:#020617;color:white;font-family:Arial}
 #top{height:60px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;padding:0 20px}
 #container{display:flex;height:calc(100vh - 60px)}
-#chat{width:25%;border-right:1px solid #1e293b;display:flex;flex-direction:column}
-#messages{flex:1;overflow:auto;padding:10px}
-#chat input{padding:10px;border:none}
-#main{width:75%;padding:20px}
+#main{width:100%;padding:20px}
 .match{border:1px solid #1e293b;padding:10px;border-radius:8px;margin-bottom:10px}
 button{background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer}
-button.red{background:#dc2626}
 
 .modal-bg{
   position:fixed;inset:0;
@@ -24,102 +19,89 @@ button.red{background:#dc2626}
   display:none;
   align-items:center;
   justify-content:center;
-  animation:fade .2s;
 }
 .modal{
   background:#020617;
   border:1px solid #1e293b;
   border-radius:10px;
   padding:20px;
-  width:340px;
-  animation:scale .2s;
+  width:420px;
 }
-@keyframes fade{from{opacity:0}to{opacity:1}}
-@keyframes scale{from{transform:scale(.8)}to{transform:scale(1)}}
 
-.item{
-  display:flex;
-  align-items:center;
+.grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
   gap:10px;
+}
+.item{
   border:1px solid #1e293b;
   padding:6px;
   border-radius:6px;
-  margin-bottom:6px;
+  text-align:center;
   cursor:pointer;
 }
 .item.selected{background:#1e293b}
 
+#coinflip{
+  margin-top:30px;
+  text-align:center;
+}
 .coin{
-  width:120px;height:120px;
+  width:140px;height:140px;
   border-radius:50%;
-  background:#facc15;
+  background:linear-gradient(145deg,#fde047,#eab308);
   color:black;
   font-size:48px;
   display:flex;
   align-items:center;
   justify-content:center;
   margin:auto;
-  animation:spin 2s;
+  animation:flip 2.5s cubic-bezier(.25,.8,.25,1);
 }
-@keyframes spin{from{transform:rotateY(0)}to{transform:rotateY(720deg)}}
+@keyframes flip{
+  0%{transform:rotateY(0) scale(1)}
+  50%{transform:rotateY(720deg) scale(1.2)}
+  100%{transform:rotateY(1080deg) scale(1)}
+}
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
-<div id="loginBg" class="modal-bg" style="display:flex">
-  <div class="modal">
-    <h2>Login</h2>
-    <input id="loginName" placeholder="Roblox username" style="width:100%;padding:8px">
-    <br><br>
-    <button onclick="login()">Login</button>
-  </div>
-</div>
-
-<!-- WALLET -->
-<div id="walletBg" class="modal-bg">
-  <div class="modal">
-    <h3>Wallet</h3>
-    <div id="walletItems"></div>
-    <p>Total Value: <b id="totalValue"></b></p>
-    <button onclick="closeWallet()">Close</button>
-  </div>
-</div>
-
-<!-- CREATE MATCH -->
-<div id="createBg" class="modal-bg">
-  <div class="modal">
-    <h3>Create Match</h3>
-    <div id="selectItems"></div>
-    <div style="display:flex;gap:10px;margin-top:10px">
-      <button onclick="side='H'">H</button>
-      <button onclick="side='T'">T</button>
-    </div>
-    <br>
-    <button onclick="confirmMatch()">Create</button>
-    <button class="red" onclick="closeCreate()">Cancel</button>
-  </div>
-</div>
-
 <div id="top">
-  <div id="userLabel"></div>
-  <div>
-    <button onclick="openWallet()">Wallet</button>
-    <button onclick="openCreate()">Create Match</button>
-    <button class="red" onclick="logout()">Logout</button>
-  </div>
+  <div id="user"></div>
+  <button onclick="openCreate()">Create Match</button>
 </div>
 
 <div id="container">
-  <div id="chat">
-    <div id="messages"></div>
-    <input id="chatInput" placeholder="Mesaj yaz...">
-  </div>
   <div id="main">
     <h2>Matches</h2>
     <div id="matches"></div>
     <div id="coinflip"></div>
+  </div>
+</div>
+
+<!-- CREATE -->
+<div id="createBg" class="modal-bg">
+  <div class="modal">
+    <h3>Create Match</h3>
+    <div id="createItems" class="grid"></div>
+    <br>
+    <button onclick="side='H'">H</button>
+    <button onclick="side='T'">T</button>
+    <br><br>
+    <button onclick="createMatch()">Create</button>
+    <button onclick="closeCreate()">Cancel</button>
+  </div>
+</div>
+
+<!-- JOIN -->
+<div id="joinBg" class="modal-bg">
+  <div class="modal">
+    <h3>Join Match</h3>
+    <div id="joinItems" class="grid"></div>
+    <br>
+    <button onclick="confirmJoin()">Join</button>
   </div>
 </div>
 
@@ -130,84 +112,33 @@ const pubnub=new PubNub({
  uuid:"u"+Math.random()
 });
 
-let user=localStorage.getItem("user");
-let wallet=JSON.parse(localStorage.getItem("wallet")||"null");
-let matches={},selected=[],side=null;
+let user=localStorage.getItem("user")||prompt("Username?");
+localStorage.setItem("user",user);
+document.getElementById("user").innerText=user;
 
-const BLOSSOM={
+const ITEM={
  name:"Blossom",
  value:910,
  img:"https://supremevalues.com/media/mm2godlies/Blossom.png"
 };
 
-if(user){
- loginBg.style.display="none";
- userLabel.innerText=user;
- if(!wallet){wallet={Blossom:20};saveWallet();}
-}else{
- document.getElementById("top").style.display="none";
- document.getElementById("container").style.display="none";
-}
+let wallet=JSON.parse(localStorage.getItem("wallet")||"null");
+if(!wallet){wallet={Blossom:20};saveWallet();}
+
+let matches={},side=null,selected=[],joinMatchId=null;
 
 function saveWallet(){localStorage.setItem("wallet",JSON.stringify(wallet));}
 
-function login(){
- user=loginName.value;
- localStorage.setItem("user",user);
- location.reload();
-}
-function logout(){
- localStorage.clear();
- location.reload();
-}
-
-function openWallet(){
- walletBg.style.display="flex";
- walletItems.innerHTML=`
- <div class="item">
-   <img src="${BLOSSOM.img}" width="40">
-   Blossom x${wallet.Blossom} (${BLOSSOM.value})
- </div>`;
- totalValue.innerText=wallet.Blossom*BLOSSOM.value;
-}
-function closeWallet(){walletBg.style.display="none";}
-
-function openCreate(){
- selected=[];side=null;
- createBg.style.display="flex";
- selectItems.innerHTML="";
- for(let i=0;i<wallet.Blossom;i++){
-   const d=document.createElement("div");
-   d.className="item";
-   d.innerHTML=`<img src="${BLOSSOM.img}" width="30"> Blossom`;
-   d.onclick=()=>{d.classList.toggle("selected");};
-   selectItems.appendChild(d);
- }
-}
-function closeCreate(){createBg.style.display="none";}
-
-function confirmMatch(){
- const count=document.querySelectorAll(".item.selected").length;
- if(count==0||!side)return alert("Item & side seç");
- const id=Date.now();
- pubnub.publish({
-  channel:"matches",
-  message:{type:"create",id,creator:user,count,side}
- });
- createBg.style.display="none";
-}
-
-pubnub.subscribe({channels:["chat","matches"]});
+pubnub.subscribe({channels:["matches"]});
 pubnub.addListener({
  message:e=>{
-  if(e.channel==="chat")messages.innerHTML+=`<div><b>${e.message.u}:</b> ${e.message.t}</div>`;
   if(e.channel==="matches"){
     if(e.message.type==="create")matches[e.message.id]=e.message;
     if(e.message.type==="remove")delete matches[e.message.id];
     render();
   }
   if(e.channel.startsWith("match-")){
-    coinflip.innerHTML=`<div class="coin">${e.message.r}</div>`;
+    playFlip(e.message.result,e.message.winner);
   }
  }
 });
@@ -215,29 +146,76 @@ pubnub.addListener({
 function render(){
  matchesDiv.innerHTML="";
  Object.values(matches).forEach(m=>{
-   matchesDiv.innerHTML+=`
-   <div class="match">
+  matchesDiv.innerHTML+=`
+  <div class="match">
     ${m.creator} (${m.count} Blossom) - ${m.side}
     <br><br>
-    <button onclick="join(${m.id})">Join</button>
-    <button onclick="watch(${m.id})">View</button>
-   </div>`;
+    <button onclick="openJoin(${m.id})">Join</button>
+  </div>`;
  });
 }
-function join(id){
- pubnub.subscribe({channels:["match-"+id]});
- const r=Math.random()<.5?"H":"T";
- pubnub.publish({channel:"match-"+id,message:{r}});
- pubnub.publish({channel:"matches",message:{type:"remove",id}});
-}
-function watch(id){pubnub.subscribe({channels:["match-"+id]});}
 
-chatInput.onkeypress=e=>{
- if(e.key==="Enter"){
-  pubnub.publish({channel:"chat",message:{u:user,t:e.target.value}});
-  e.target.value="";
+function openCreate(){
+ selected=[];side=null;
+ createBg.style.display="flex";
+ createItems.innerHTML="";
+ for(let i=0;i<wallet.Blossom;i++){
+  const d=document.createElement("div");
+  d.className="item";
+  d.innerHTML=`<img src="${ITEM.img}" width="40"><br>Blossom`;
+  d.onclick=()=>d.classList.toggle("selected");
+  createItems.appendChild(d);
  }
-};
+}
+function closeCreate(){createBg.style.display="none";}
+
+function createMatch(){
+ const count=document.querySelectorAll("#createItems .selected").length;
+ if(!count||!side)return alert("Item & side seç");
+ const id=Date.now();
+ wallet.Blossom-=count;saveWallet();
+ pubnub.publish({channel:"matches",message:{type:"create",id,creator:user,count,side}});
+ closeCreate();
+}
+
+function openJoin(id){
+ joinMatchId=id;
+ joinBg.style.display="flex";
+ joinItems.innerHTML="";
+ for(let i=0;i<wallet.Blossom;i++){
+  const d=document.createElement("div");
+  d.className="item";
+  d.innerHTML=`<img src="${ITEM.img}" width="40"><br>Blossom`;
+  d.onclick=()=>d.classList.toggle("selected");
+  joinItems.appendChild(d);
+ }
+}
+
+function confirmJoin(){
+ const count=document.querySelectorAll("#joinItems .selected").length;
+ if(!count)return alert("Item seç");
+ wallet.Blossom-=count;saveWallet();
+ joinBg.style.display="none";
+
+ pubnub.subscribe({channels:["match-"+joinMatchId]});
+ const res=Math.random()<.5?"H":"T";
+ const winner=res===matches[joinMatchId].side?matches[joinMatchId].creator:user;
+
+ if(winner===user)wallet.Blossom+=matches[joinMatchId].count+count;
+ saveWallet();
+
+ pubnub.publish({
+  channel:"match-"+joinMatchId,
+  message:{result:res,winner}
+ });
+ pubnub.publish({channel:"matches",message:{type:"remove",id:joinMatchId}});
+}
+
+function playFlip(r,w){
+ coinflip.innerHTML=`
+  <div class="coin">${r}</div>
+  <h2>${w} WON</h2>`;
+}
 </script>
 </body>
 </html>
