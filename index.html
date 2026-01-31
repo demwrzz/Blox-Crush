@@ -6,6 +6,7 @@
 <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.6.0.min.js"></script>
 
 <style>
+*{box-sizing:border-box}
 body{margin:0;background:#020617;color:white;font-family:Arial}
 #top{height:60px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center;padding:0 20px}
 #container{display:flex;height:calc(100vh - 60px)}
@@ -15,23 +16,89 @@ body{margin:0;background:#020617;color:white;font-family:Arial}
 #main{width:75%;padding:20px}
 .match{border:1px solid #1e293b;padding:10px;border-radius:8px;margin-bottom:10px}
 button{background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer}
-#coinflip{text-align:center;margin-top:30px}
-.coin{width:120px;height:120px;border-radius:50%;background:#facc15;color:black;font-size:48px;
-display:flex;align-items:center;justify-content:center;margin:auto;animation:spin 2s}
+button.red{background:#dc2626}
+
+.modal-bg{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.7);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  animation:fade .2s;
+}
+.modal{
+  background:#020617;
+  border:1px solid #1e293b;
+  border-radius:10px;
+  padding:20px;
+  width:340px;
+  animation:scale .2s;
+}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes scale{from{transform:scale(.8)}to{transform:scale(1)}}
+
+.item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border:1px solid #1e293b;
+  padding:6px;
+  border-radius:6px;
+  margin-bottom:6px;
+  cursor:pointer;
+}
+.item.selected{background:#1e293b}
+
+.coin{
+  width:120px;height:120px;
+  border-radius:50%;
+  background:#facc15;
+  color:black;
+  font-size:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:auto;
+  animation:spin 2s;
+}
 @keyframes spin{from{transform:rotateY(0)}to{transform:rotateY(720deg)}}
-#loginScreen{position:fixed;inset:0;background:#020617;display:flex;align-items:center;justify-content:center}
-#walletModal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center}
-.modal{background:#020617;border:1px solid #1e293b;padding:20px;border-radius:10px;width:300px}
 </style>
 </head>
 
 <body>
 
-<div id="loginScreen">
+<!-- LOGIN -->
+<div id="loginBg" class="modal-bg" style="display:flex">
   <div class="modal">
     <h2>Login</h2>
-    <input id="loginName" placeholder="Roblox username" style="width:100%;padding:8px"><br><br>
+    <input id="loginName" placeholder="Roblox username" style="width:100%;padding:8px">
+    <br><br>
     <button onclick="login()">Login</button>
+  </div>
+</div>
+
+<!-- WALLET -->
+<div id="walletBg" class="modal-bg">
+  <div class="modal">
+    <h3>Wallet</h3>
+    <div id="walletItems"></div>
+    <p>Total Value: <b id="totalValue"></b></p>
+    <button onclick="closeWallet()">Close</button>
+  </div>
+</div>
+
+<!-- CREATE MATCH -->
+<div id="createBg" class="modal-bg">
+  <div class="modal">
+    <h3>Create Match</h3>
+    <div id="selectItems"></div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <button onclick="side='H'">H</button>
+      <button onclick="side='T'">T</button>
+    </div>
+    <br>
+    <button onclick="confirmMatch()">Create</button>
+    <button class="red" onclick="closeCreate()">Cancel</button>
   </div>
 </div>
 
@@ -39,7 +106,8 @@ display:flex;align-items:center;justify-content:center;margin:auto;animation:spi
   <div id="userLabel"></div>
   <div>
     <button onclick="openWallet()">Wallet</button>
-    <button onclick="createMatch()">Create Match</button>
+    <button onclick="openCreate()">Create Match</button>
+    <button class="red" onclick="logout()">Logout</button>
   </div>
 </div>
 
@@ -55,125 +123,121 @@ display:flex;align-items:center;justify-content:center;margin:auto;animation:spi
   </div>
 </div>
 
-<div id="walletModal">
-  <div class="modal">
-    <h3>Wallet</h3>
-    <div id="walletItems"></div>
-    <p><b>Total Value:</b> <span id="totalValue"></span></p>
-    <button onclick="closeWallet()">Close</button>
-  </div>
-</div>
-
 <script>
-const pubnub = new PubNub({
-  publishKey:"pub-c-59b96e01-f4ca-486b-bde1-e3160adbc839",
-  subscribeKey:"sub-c-3f46e9b1-23c3-4f38-8370-50666a4f1e57",
-  uuid:"user-"+Math.random()
+const pubnub=new PubNub({
+ publishKey:"pub-c-59b96e01-f4ca-486b-bde1-e3160adbc839",
+ subscribeKey:"sub-c-3f46e9b1-23c3-4f38-8370-50666a4f1e57",
+ uuid:"u"+Math.random()
 });
 
-let username = localStorage.getItem("username");
-let wallet = JSON.parse(localStorage.getItem("wallet")||"null");
-let matches = {};
+let user=localStorage.getItem("user");
+let wallet=JSON.parse(localStorage.getItem("wallet")||"null");
+let matches={},selected=[],side=null;
 
-if(username){
-  document.getElementById("loginScreen").style.display="none";
-  document.getElementById("userLabel").innerText=username;
-  if(!wallet){
-    wallet={Blossom:20};
-    localStorage.setItem("wallet",JSON.stringify(wallet));
-  }
-}else{
-  document.getElementById("top").style.display="none";
-  document.getElementById("container").style.display="none";
-}
-
-function login(){
-  username=document.getElementById("loginName").value;
-  localStorage.setItem("username",username);
-  location.reload();
-}
-
-pubnub.subscribe({channels:["chat","matches"]});
-
-pubnub.addListener({
-  message:e=>{
-    if(e.channel==="chat"){
-      addMsg(e.message.user,e.message.text);
-    }
-    if(e.channel==="matches"){
-      if(e.message.type==="create")matches[e.message.id]=e.message;
-      if(e.message.type==="remove")delete matches[e.message.id];
-      renderMatches();
-    }
-    if(e.channel.startsWith("match-")){
-      showCoinflip(e.message.result,e.message.winner);
-    }
-  }
-});
-
-pubnub.history({channel:"chat",count:50},(_,r)=>{
-  r.messages.forEach(m=>addMsg(m.entry.user,m.entry.text));
-});
-pubnub.history({channel:"matches",count:50},(_,r)=>{
-  r.messages.forEach(m=>{
-    if(m.entry.type==="create")matches[m.entry.id]=m.entry;
-    if(m.entry.type==="remove")delete matches[m.entry.id];
-  });
-  renderMatches();
-});
-
-function addMsg(u,t){
-  messages.innerHTML+=`<div><b>${u}:</b> ${t}</div>`;
-}
-
-chatInput.onkeypress=e=>{
-  if(e.key==="Enter"){
-    pubnub.publish({channel:"chat",message:{user:username,text:e.target.value}});
-    e.target.value="";
-  }
+const BLOSSOM={
+ name:"Blossom",
+ value:910,
+ img:"https://supremevalues.com/media/mm2godlies/Blossom.png"
 };
 
-function createMatch(){
-  const id=Date.now();
-  pubnub.publish({channel:"matches",message:{type:"create",id,creator:username}});
+if(user){
+ loginBg.style.display="none";
+ userLabel.innerText=user;
+ if(!wallet){wallet={Blossom:20};saveWallet();}
+}else{
+ document.getElementById("top").style.display="none";
+ document.getElementById("container").style.display="none";
 }
 
-function renderMatches(){
-  matchesDiv.innerHTML="";
-  Object.values(matches).forEach(m=>{
-    matchesDiv.innerHTML+=`
-      <div class="match">
-        ${m.creator}
-        <br><br>
-        <button onclick="joinMatch(${m.id})">Join</button>
-        <button onclick="viewMatch(${m.id})">View</button>
-      </div>`;
-  });
-}
+function saveWallet(){localStorage.setItem("wallet",JSON.stringify(wallet));}
 
-function joinMatch(id){
-  pubnub.subscribe({channels:["match-"+id]});
-  const res=Math.random()<.5?"H":"T";
-  if(res==="H")wallet.Blossom+=20;
-  localStorage.setItem("wallet",JSON.stringify(wallet));
-  pubnub.publish({channel:"match-"+id,message:{result:res,winner:res==="H"?username:"Opponent"}});
-  pubnub.publish({channel:"matches",message:{type:"remove",id}});
+function login(){
+ user=loginName.value;
+ localStorage.setItem("user",user);
+ location.reload();
 }
-
-function viewMatch(id){
-  pubnub.subscribe({channels:["match-"+id]});
-}
-
-function showCoinflip(r,w){
-  coinflip.innerHTML=`<div class="coin">${r}</div><h3>${w} WON</h3>`;
+function logout(){
+ localStorage.clear();
+ location.reload();
 }
 
 function openWallet(){
-  walletItems.innerHTML=`Blossom x${wallet.Blossom}`;
-  totalValue.innerText=wallet.Blossom*910;
-  walletModal.style.display="flex";
+ walletBg.style.display="flex";
+ walletItems.innerHTML=`
+ <div class="item">
+   <img src="${BLOSSOM.img}" width="40">
+   Blossom x${wallet.Blossom} (${BLOSSOM.value})
+ </div>`;
+ totalValue.innerText=wallet.Blossom*BLOSSOM.value;
 }
-function closeWallet(){walletModal.style.display="none";}
+function closeWallet(){walletBg.style.display="none";}
+
+function openCreate(){
+ selected=[];side=null;
+ createBg.style.display="flex";
+ selectItems.innerHTML="";
+ for(let i=0;i<wallet.Blossom;i++){
+   const d=document.createElement("div");
+   d.className="item";
+   d.innerHTML=`<img src="${BLOSSOM.img}" width="30"> Blossom`;
+   d.onclick=()=>{d.classList.toggle("selected");};
+   selectItems.appendChild(d);
+ }
+}
+function closeCreate(){createBg.style.display="none";}
+
+function confirmMatch(){
+ const count=document.querySelectorAll(".item.selected").length;
+ if(count==0||!side)return alert("Item & side seç");
+ const id=Date.now();
+ pubnub.publish({
+  channel:"matches",
+  message:{type:"create",id,creator:user,count,side}
+ });
+ createBg.style.display="none";
+}
+
+pubnub.subscribe({channels:["chat","matches"]});
+pubnub.addListener({
+ message:e=>{
+  if(e.channel==="chat")messages.innerHTML+=`<div><b>${e.message.u}:</b> ${e.message.t}</div>`;
+  if(e.channel==="matches"){
+    if(e.message.type==="create")matches[e.message.id]=e.message;
+    if(e.message.type==="remove")delete matches[e.message.id];
+    render();
+  }
+  if(e.channel.startsWith("match-")){
+    coinflip.innerHTML=`<div class="coin">${e.message.r}</div>`;
+  }
+ }
+});
+
+function render(){
+ matchesDiv.innerHTML="";
+ Object.values(matches).forEach(m=>{
+   matchesDiv.innerHTML+=`
+   <div class="match">
+    ${m.creator} (${m.count} Blossom) - ${m.side}
+    <br><br>
+    <button onclick="join(${m.id})">Join</button>
+    <button onclick="watch(${m.id})">View</button>
+   </div>`;
+ });
+}
+function join(id){
+ pubnub.subscribe({channels:["match-"+id]});
+ const r=Math.random()<.5?"H":"T";
+ pubnub.publish({channel:"match-"+id,message:{r}});
+ pubnub.publish({channel:"matches",message:{type:"remove",id}});
+}
+function watch(id){pubnub.subscribe({channels:["match-"+id]});}
+
+chatInput.onkeypress=e=>{
+ if(e.key==="Enter"){
+  pubnub.publish({channel:"chat",message:{u:user,t:e.target.value}});
+  e.target.value="";
+ }
+};
 </script>
 </body>
 </html>
