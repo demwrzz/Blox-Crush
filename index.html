@@ -1,226 +1,253 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BloxyBet Clone - Coinflip</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        body { background-color: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; }
-        .btn-primary { background-color: #3b82f6; transition: 0.2s; }
-        .btn-primary:hover { background-color: #2563eb; }
-        .btn-secondary { background-color: #334155; transition: 0.2s; }
-        .btn-secondary:hover { background-color: #475569; }
-        .coin-animation { animation: flip 2s infinite; }
-        @keyframes flip {
-            0%, 100% { transform: rotateY(0); }
-            50% { transform: rotateY(180deg); }
-        }
-    </style>
+<meta charset="UTF-8">
+<title>Bloxybet MM2 Demo</title>
+
+<script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.6.0.min.js"></script>
+
+<style>
+body {
+  margin: 0;
+  background: #020617;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+#topbar {
+  height: 60px;
+  background: #020617;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+}
+
+#container {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+
+#chat {
+  width: 25%;
+  border-right: 1px solid #1e293b;
+  display: flex;
+  flex-direction: column;
+}
+
+#messages {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+#chat input {
+  padding: 10px;
+  border: none;
+}
+
+#main {
+  width: 75%;
+  padding: 20px;
+}
+
+.match {
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+button {
+  background: #2563eb;
+  border: none;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#coinflip {
+  margin-top: 40px;
+  text-align: center;
+}
+
+.coin {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: linear-gradient(145deg,#facc15,#eab308);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  margin: auto;
+  animation: spin 2s linear;
+}
+
+@keyframes spin {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(720deg); }
+}
+</style>
 </head>
-<body class="flex flex-col min-h-screen">
 
-    <!-- Header / Navbar -->
-    <header class="card m-4 p-4 flex justify-between items-center">
-        <div class="flex items-center gap-2">
-            <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center font-bold text-xl">B</div>
-            <h1 class="text-xl font-black tracking-tighter">BLOXY<span class="text-blue-500">BET</span></h1>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="bg-slate-900 px-4 py-2 rounded-lg flex items-center gap-2 border border-slate-700">
-                <i class="fas fa-coins text-yellow-500"></i>
-                <span id="balance" class="font-bold">100,000</span>
-            </div>
-            <button class="btn-primary px-6 py-2 rounded-lg font-bold">DEPOSIT</button>
-        </div>
-    </header>
+<body>
 
-    <main class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 px-4 pb-4">
-        
-        <!-- Sidebar / Chat -->
-        <div class="lg:col-span-1 flex flex-col gap-4">
-            <div class="card flex-1 flex flex-col p-4">
-                <h3 class="font-bold mb-4 flex items-center gap-2">
-                    <i class="fas fa-comments text-blue-500"></i> CANLI SOHBET
-                </h3>
-                <div id="chat-messages" class="flex-1 overflow-y-auto space-y-2 text-sm mb-4 max-h-[500px]">
-                    <div class="bg-slate-800 p-2 rounded">
-                        <span class="text-blue-400 font-bold">Sistem:</span> Hoş geldiniz! Adil oyunlar dileriz.
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <input id="chat-input" type="text" placeholder="Mesaj yaz..." class="bg-slate-900 border border-slate-700 rounded p-2 flex-1 outline-none focus:border-blue-500">
-                    <button onclick="sendChatMessage()" class="btn-primary w-10 h-10 rounded flex items-center justify-center"><i class="fas fa-paper-plane"></i></button>
-                </div>
-            </div>
-        </div>
+<div id="topbar">
+  <div>
+    Username:
+    <input id="username" placeholder="Roblox adı">
+    <button onclick="login()">Login</button>
+  </div>
+  <button onclick="createMatch()">Create Match</button>
+</div>
 
-        <!-- Main Content / Coinflip -->
-        <div class="lg:col-span-3 flex flex-col gap-4">
-            
-            <!-- Create Match Section -->
-            <div class="card p-6">
-                <div class="flex flex-wrap justify-between items-center gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold">COINFLIP</h2>
-                        <p class="text-slate-400 text-sm">Şansını dene, ikiye katla!</p>
-                    </div>
-                    <div class="flex gap-4">
-                        <div class="flex items-center bg-slate-900 rounded-lg p-1 border border-slate-700">
-                            <input id="bet-amount" type="number" value="1000" class="bg-transparent px-3 py-1 w-32 outline-none font-bold">
-                            <button onclick="setMaxBet()" class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">MAX</button>
-                        </div>
-                        <button onclick="createMatch()" class="btn-primary px-8 py-2 rounded-lg font-bold shadow-lg shadow-blue-500/20">CREATE MATCH</button>
-                    </div>
-                </div>
-            </div>
+<div id="container">
 
-            <!-- Match List -->
-            <div id="match-list" class="space-y-4">
-                <div class="card p-4 flex justify-between items-center animate-pulse">
-                    <div class="flex items-center gap-6">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-slate-700 rounded-full"></div>
-                            <span class="font-bold text-slate-400">Oyuncu Bekleniyor...</span>
-                        </div>
-                        <div class="text-2xl font-black text-blue-500">VS</div>
-                        <div class="w-10 h-10 bg-slate-700 rounded-full border-2 border-dashed border-slate-500"></div>
-                    </div>
-                    <div class="flex items-center gap-8">
-                        <div class="text-right">
-                            <div class="text-sm text-slate-400">Bahis</div>
-                            <div class="font-bold text-yellow-500">1,000 <i class="fas fa-coins text-xs"></i></div>
-                        </div>
-                        <button class="btn-primary px-8 py-2 rounded-lg font-bold">JOIN</button>
-                    </div>
-                </div>
-            </div>
+  <div id="chat">
+    <div id="messages"></div>
+    <input id="chatInput" placeholder="Mesaj yaz..." />
+  </div>
 
-        </div>
-    </main>
+  <div id="main">
+    <h2>Matches</h2>
+    <div id="matches"></div>
+    <div id="coinflip"></div>
+  </div>
 
-    <!-- Overlay / Win Modal -->
-    <div id="modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-        <div class="card p-8 text-center max-w-sm w-full mx-4">
-            <div class="w-24 h-24 bg-yellow-500 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg shadow-yellow-500/50">
-                <i class="fas fa-trophy text-4xl text-white"></i>
-            </div>
-            <h2 class="text-3xl font-black mb-2">TEBRİKLER!</h2>
-            <p id="modal-text" class="text-slate-300 mb-6 text-lg">Kazandın!</p>
-            <button onclick="closeModal()" class="btn-primary w-full py-3 rounded-lg font-bold">HARİKA!</button>
-        </div>
-    </div>
+</div>
 
-    <script>
-        let userBalance = 100000;
-        const balanceEl = document.getElementById('balance');
-        const matchList = document.getElementById('match-list');
-        const chatMessages = document.getElementById('chat-messages');
+<script>
+// 🔑 PUBNUB KEYS (BURAYI DEĞİŞTİR)
+const pubnub = new PubNub({
+  publishKey: "pub-c-59b96e01-f4ca-486b-bde1-e3160adbc839",
+  subscribeKey: "sub-c-3f46e9b1-23c3-4f38-8370-50666a4f1e57",
+  uuid: "user_" + Math.random().toString(36).slice(2)
+});
 
-        function updateBalance(amount) {
-            userBalance += amount;
-            balanceEl.innerText = userBalance.toLocaleString();
-        }
+let username = "";
+let matches = {};
 
-        function setMaxBet() {
-            document.getElementById('bet-amount').value = userBalance;
-        }
+// 📡 SUBSCRIBE
+pubnub.subscribe({
+  channels: ["public-chat", "public-matches"]
+});
 
-        function sendChatMessage() {
-            const input = document.getElementById('chat-input');
-            if (!input.value.trim()) return;
-            const msg = document.createElement('div');
-            msg.className = 'bg-slate-800 p-2 rounded';
-            msg.innerHTML = `<span class="text-slate-400 font-bold">Siz:</span> ${input.value}`;
-            chatMessages.appendChild(msg);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            input.value = '';
-        }
+// 👂 LISTENER
+pubnub.addListener({
+  message: event => {
+    const msg = event.message;
 
-        function createMatch() {
-            const amount = parseInt(document.getElementById('bet-amount').value);
-            if (isNaN(amount) || amount <= 0 || amount > userBalance) {
-                alert('Geçersiz bakiye!');
-                return;
-            }
-            updateBalance(-amount);
-            const matchId = Date.now();
-            const matchHtml = `
-                <div id="match-${matchId}" class="card p-4 flex justify-between items-center bg-slate-800/50">
-                    <div class="flex items-center gap-6">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">S</div>
-                            <span class="font-bold">Siz</span>
-                        </div>
-                        <div class="text-2xl font-black text-blue-500">VS</div>
-                        <div class="flex items-center gap-3 opacity-50">
-                            <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center"><i class="fas fa-robot"></i></div>
-                            <span class="text-sm">BOT</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-8">
-                        <div class="text-right">
-                            <div class="text-sm text-slate-400">Bahis</div>
-                            <div class="font-bold text-yellow-500">${amount.toLocaleString()} <i class="fas fa-coins text-xs"></i></div>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="playMatch(${matchId}, ${amount})" class="btn-primary px-6 py-2 rounded-lg font-bold">BOTLA OYNA</button>
-                            <button onclick="cancelMatch(${matchId}, ${amount})" class="btn-secondary px-4 py-2 rounded-lg font-bold text-red-400"><i class="fas fa-times"></i></button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            matchList.insertAdjacentHTML('afterbegin', matchHtml);
-        }
+    // CHAT
+    if (event.channel === "public-chat") {
+      document.getElementById("messages").innerHTML +=
+        `<div><b>${msg.user}:</b> ${msg.text}</div>`;
+    }
 
-        function cancelMatch(id, amount) {
-            document.getElementById(`match-${id}`).remove();
-            updateBalance(amount);
-        }
+    // MATCH SYSTEM
+    if (event.channel === "public-matches") {
+      if (msg.type === "create") {
+        matches[msg.id] = msg;
+      }
+      if (msg.type === "remove") {
+        delete matches[msg.id];
+      }
+      renderMatches();
+    }
 
-        function playMatch(id, amount) {
-            const el = document.getElementById(`match-${id}`);
-            el.innerHTML = `
-                <div class="w-full flex flex-col items-center py-4 gap-4">
-                    <div class="text-xl font-bold text-blue-400">PARA DÖNÜYOR...</div>
-                    <div class="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center coin-animation text-4xl">
-                        <i class="fas fa-coins text-white"></i>
-                    </div>
-                </div>
-            `;
-            setTimeout(() => {
-                const win = Math.random() > 0.5;
-                if (win) {
-                    updateBalance(amount * 2);
-                    showModal(`Tebrikler! ${amount * 2} Token kazandın!`);
-                } else {
-                    showModal(`Kaybettin! Bir dahaki sefere...`, true);
-                }
-                el.remove();
-            }, 2000);
-        }
+    // COINFLIP
+    if (event.channel.startsWith("match-") && msg.type === "coinflip") {
+      showCoinflip(msg.result, msg.winner);
+    }
+  }
+});
 
-        function showModal(text, lose = false) {
-            const modal = document.getElementById('modal');
-            const modalText = document.getElementById('modal-text');
-            modalText.innerText = text;
-            modal.classList.remove('hidden');
-            const iconBox = modal.querySelector('.w-24');
-            const title = modal.querySelector('h2');
-            if (lose) {
-                iconBox.className = 'w-24 h-24 bg-red-500 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg shadow-red-500/50';
-                title.innerText = 'KAYBETTİN';
-            } else {
-                iconBox.className = 'w-24 h-24 bg-yellow-500 rounded-full mx-auto mb-4 flex items-center justify-center shadow-lg shadow-yellow-500/50';
-                title.innerText = 'TEBRİKLER!';
-            }
-        }
+// LOGIN
+function login() {
+  username = document.getElementById("username").value;
+  alert("Logged in as " + username);
+}
 
-        function closeModal() {
-            document.getElementById('modal').classList.add('hidden');
-        }
-    </script>
+// CHAT SEND
+document.getElementById("chatInput").addEventListener("keypress", e => {
+  if (e.key === "Enter") {
+    pubnub.publish({
+      channel: "public-chat",
+      message: { user: username, text: e.target.value }
+    });
+    e.target.value = "";
+  }
+});
+
+// CREATE MATCH
+function createMatch() {
+  const id = Date.now();
+
+  pubnub.publish({
+    channel: "public-matches",
+    message: {
+      type: "create",
+      id,
+      creator: username,
+      item: "Blossom",
+      value: 910
+    }
+  });
+}
+
+// RENDER MATCHES
+function renderMatches() {
+  const div = document.getElementById("matches");
+  div.innerHTML = "";
+  Object.values(matches).forEach(m => {
+    div.innerHTML += `
+      <div class="match">
+        ${m.creator} - ${m.item} (${m.value})
+        <br><br>
+        <button onclick="joinMatch(${m.id})">Join</button>
+        <button onclick="viewMatch(${m.id})">View</button>
+      </div>
+    `;
+  });
+}
+
+// JOIN MATCH
+function joinMatch(id) {
+  pubnub.subscribe({ channels: ["match-" + id] });
+
+  const result = Math.random() < 0.5 ? "H" : "T";
+
+  pubnub.publish({
+    channel: "match-" + id,
+    message: {
+      type: "coinflip",
+      result,
+      winner: result === "H" ? "Creator" : "Joiner"
+    }
+  });
+
+  pubnub.publish({
+    channel: "public-matches",
+    message: { type: "remove", id }
+  });
+}
+
+// VIEW MATCH
+function viewMatch(id) {
+  pubnub.subscribe({ channels: ["match-" + id] });
+  alert("Now watching match " + id);
+}
+
+// SHOW COINFLIP
+function showCoinflip(result, winner) {
+  document.getElementById("coinflip").innerHTML = `
+    <div class="coin">${result}</div>
+    <h3>${winner} WON</h3>
+  `;
+}
+</script>
+
 </body>
 </html>
